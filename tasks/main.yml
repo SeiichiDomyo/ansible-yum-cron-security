@@ -1,0 +1,38 @@
+---
+# tasks file for SeiichiDomyo.yum-cron-security
+
+- hosts: vagrant
+  sudo: yes
+
+  tasks:
+    - name: upgrade yum-* packages
+#      yum: name=yum-* state=latest
+      yum: name="{{ item }}" state=latest
+      with_items:
+         - yum
+         - yum-plugin-fastestmirror
+         - yum-metadata-parser
+         - yum-utils
+
+    - name: install yum-cron package
+      yum: name={{ item }} state=present
+      with_items:
+         - yum-cron
+
+    - name: check yum-cron-security
+      shell: egrep -q '^update_cmd = security' /etc/yum/yum-cron.conf
+      register: egrep_result
+      failed_when: egrep_result.rc not in [0,1]
+      changed_when: false
+      always_run: yes
+
+    - name: setup yum-cron-security
+      shell: sed -i -e 's/^update_cmd = default/update_cmd = security/g' -e 's/^apply_update = no/apply_updates = yes/g' /etc/yum/yum-cron.conf
+      when: egrep_result.rc == 1
+
+    - name: check yum-cron
+      shell: systemctl is-enabled yum-cron.service
+      register: yum-cron_result
+    
+    - name: restart yum-cron
+      service: name=yum-cron state=restarted enabled=yes
