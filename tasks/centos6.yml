@@ -1,0 +1,32 @@
+---
+# tasks file for SeiichiDomyo.yum-cron-security
+
+- hosts: centos6
+  sudo: yes
+
+  tasks:
+    - name: update yum package
+      yum: name={{ item }} state=latest
+      with_items:
+         - yum
+
+    - name: install yum-plugin-security package
+      yum: name={{ item }} state=latest
+      with_items:
+         - yum-plugin-security
+
+    - name: install yum-cron package
+      yum: name={{ item }} state=latest
+      with_items:
+         - yum-cron
+
+    - name: check yum-cron
+      shell: /sbin/chkconfig --list yum-cron | egrep [0-6]:on
+      register: _yum_cron
+      failed_when: _yum_cron.rc not in [0,1]
+      changed_when: false
+      always_run: yes
+
+    - name: restart yum-cron
+      service: name=yum-cron state=restarted enabled=yes
+      when: _yum_cron.rc != 0

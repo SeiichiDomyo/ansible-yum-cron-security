@@ -1,0 +1,43 @@
+---
+# tasks file for SeiichiDomyo.yum-cron-security
+
+- hosts: centos7 
+  sudo: yes
+
+  tasks:
+    - name: update yum package
+      yum: name={{ item }} state=latest
+      with_items:
+         - yum
+
+    - name: install yum-cron package
+      yum: name={{ item }} state=latest
+      with_items:
+         - yum-cron
+
+    - name: check security-update
+      shell: egrep -q '^update_cmd = security' /etc/yum/yum-cron.conf
+      register: _security_update 
+      failed_when: _security_update.rc not in [0,1]
+      changed_when: false
+      always_run: yes
+
+    - name: setup security-update
+      shell: sed -i -e 's/^update_cmd = default/update_cmd = security/g' /etc/yum/yum-cron.conf
+      when: _security_update.rc != 0
+
+    - name: check auto-update
+      shell: egrep -q '^apply_updates = yes' /etc/yum/yum-cron.conf
+      register: _auto_update 
+      failed_when: _auto_update.rc not in [0,1]
+      changed_when: false
+      always_run: yes
+
+    - name: setup auto-update 
+      shell: sed -i -e 's/^apply_updates = no/apply_updates = yes/g' /etc/yum/yum-cron.conf
+      when: _auto_update.rc != 0
+
+    - name: restart yum-cron
+      service: name=yum-cron state=restarted enabled=yes
+      when: ( _security_update.rc != 0) or
+            ( _auto_update.rc != 0 )
